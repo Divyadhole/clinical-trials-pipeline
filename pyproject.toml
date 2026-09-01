@@ -1,0 +1,10 @@
+[project]
+name = "clinical-trials-pipeline"
+version = "0.1.0"
+description = "Daily incremental pipeline from the ClinicalTrials.gov API into Postgres"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]

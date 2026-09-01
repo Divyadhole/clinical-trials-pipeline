@@ -1,0 +1,41 @@
+# docker compose up
+#
+# Brings up Postgres, applies the migrations, runs one incremental load and
+# writes the status page to ./docs/index.html. Nothing else is required: no
+# account, no API key, no manual SQL.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ctp
+      POSTGRES_PASSWORD: ctp
+      POSTGRES_DB: ctp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ctp -d ctp"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  pipeline:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://ctp:ctp@postgres:5432/ctp
+      CTP_LOOKBACK_DAYS: "2"
+      CTP_REQUESTS_PER_MINUTE: "40"
+    volumes:
+      - ./docs:/app/docs
+    command: >
+      sh -c "python -m ctp migrate &&
+             python -m ctp daily &&
+             python -m ctp status"
+
+volumes:
+  pgdata:
