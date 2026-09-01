@@ -32,10 +32,14 @@ services:
       CTP_REQUESTS_PER_MINUTE: "40"
     volumes:
       - ./docs:/app/docs
-    command: >
-      sh -c "python -m ctp migrate &&
-             python -m ctp daily &&
-             python -m ctp status"
+    # The image's ENTRYPOINT is `python -m ctp`, so it is overridden here to run
+    # three subcommands in sequence rather than being handed them as arguments.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        python -m ctp migrate &&
+        python -m ctp daily &&
+        python -m ctp status
 
 volumes:
   pgdata:

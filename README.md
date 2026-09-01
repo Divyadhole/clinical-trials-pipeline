@@ -167,7 +167,16 @@ pytest                                  # unit tests only
 DATABASE_URL=postgresql://... pytest    # adds the integration tests
 ```
 
-Integration tests skip cleanly when `DATABASE_URL` is unset and run against a
-real Postgres service in CI on every push. They use synthetic payloads rather
-than live API calls, so a failure means our logic broke, not that
-ClinicalTrials.gov changed today.
+Nineteen tests. Integration tests skip cleanly when `DATABASE_URL` is unset and
+run against a real Postgres service in CI on every push. They use synthetic
+payloads rather than live API calls, so a failure means our logic broke, not
+that ClinicalTrials.gov changed today.
+
+The four worth reading:
+
+| Test | What it pins down |
+|---|---|
+| `test_reloading_the_same_window_changes_nothing` | a repeated window adds no rows to any table |
+| `test_daily_advances_the_watermark_and_repeats_cleanly` | the whole daily job, run twice, end to end |
+| `test_a_blocking_check_failure_holds_the_watermark` | a failed quality gate does not let the pipeline skip a bad day |
+| `test_a_broken_invariant_actually_fails_a_check` | the quality suite is capable of failing |
