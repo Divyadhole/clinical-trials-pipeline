@@ -5,6 +5,11 @@ description = "Daily incremental pipeline from the ClinicalTrials.gov API into P
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]
+# Without this, a bare `pytest` cannot import `ctp`: pytest puts the *test*
+# directory on sys.path, not the repo root. `python -m pytest` happens to work
+# because the interpreter adds the current directory itself — which is exactly
+# how this went unnoticed until CI ran the bare command.
+pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-q"
 filterwarnings = ["ignore::DeprecationWarning"]

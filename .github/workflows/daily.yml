@@ -31,12 +31,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Runs before anything is installed. A missing secret should cost five
+      # seconds and produce one sentence a human can act on, not sixty seconds
+      # and three stack traces in unrelated steps.
+      - name: Preflight - is the database configured?
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error title=DATABASE_URL is empty::The NEON_DATABASE_URL repository secret is not set. Add it under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          echo "DATABASE_URL is set."
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
 
       - run: pip install -r requirements.txt
+
+      # A connection string can exist and still be wrong: a deleted Neon
+      # project, a rotated password, a missing sslmode. Find out here, where
+      # the error message is about the database, rather than three steps later
+      # where it is about Prefect.
+      - name: Preflight - can we reach the database?
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+
+          import psycopg2
+
+          try:
+              with psycopg2.connect(os.environ["DATABASE_URL"], connect_timeout=15) as conn:
+                  with conn.cursor() as cur:
+                      cur.execute("select 1")
+          except Exception as exc:
+              detail = str(exc).strip().splitlines()[0] if str(exc).strip() else type(exc).__name__
+              print(f"::error title=Cannot reach the database::{detail}")
+              sys.exit(1)
+          print("Database reachable.")
+          PY
 
       - name: Verify the API contract
         run: python -m ctp verify-api
@@ -51,12 +85,27 @@ jobs:
       - name: Commit the status page
         if: always()
         run: |
+          # The status page is only written if the database was reachable. When
+          # it was not, there is nothing to commit and that is not an error —
+          # `git add` on a path that does not exist exits 128 and turns one real
+          # failure into two.
+          if [ ! -f docs/index.html ]; then
+            echo "No status page was written this run, so there is nothing to commit."
+            exit 0
+          fi
+
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/index.html
+
           if git diff --staged --quiet; then
-            echo "status page unchanged"
-          else
-            git commit -m "status: run $(date -u +%Y-%m-%dT%H:%MZ)"
-            git push
+            echo "Status page unchanged."
+            exit 0
           fi
+
+          git commit -m "status: run $(date -u +%Y-%m-%dT%H:%MZ)"
+          # Rebase before pushing: a commit of your own landing between this
+          # run's checkout and its push would otherwise reject it as non
+          # fast-forward, which also exits 128.
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

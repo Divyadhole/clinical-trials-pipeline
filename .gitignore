@@ -7,3 +7,6 @@ venv/
 .DS_Store
 *.egg-info/
 data/
+
+# Files delivered into the repo folder by the assistant; not part of the project.
+Claude outputs/
